@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f7f5ee">
+<title>Gather — Meal planner</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><div class="logo">✳</div> gather</div>
+    <div class="topright">
+      <span>A little more ease at dinner</span>
+      <div class="avatar">G</div>
+    </div>
+  </header>
+
+  <section class="intro">
+    <div>
+      <div class="eyebrow">Your week, made easier</div>
+      <h1>Meal planner</h1>
+      <p>Make a plan, keep the good recipes, shop with a little more ease.</p>
+    </div>
+    <button class="action" id="newRecipeBtn">＋ New recipe</button>
+  </section>
+
+  <div class="layout">
+    <main>
+      <section class="panel planner">
+        <div class="planner-head">
+          <h2>Weekly plan</h2>
+          <div class="week-tools">
+            <button class="icon-btn" id="prevWeek" aria-label="Previous week">‹</button>
+            <span class="week-label" id="weekLabel"></span>
+            <button class="icon-btn" id="nextWeek" aria-label="Next week">›</button>
+            <button class="today-btn" id="thisWeek">This week</button>
+          </div>
+        </div>
+        <div class="weekgrid" id="weekGrid"></div>
+        <p class="note">Tap “Add meal” to place a recipe in your plan.</p>
+      </section>
+
+      <div class="recipe-top">
+        <h2>Your recipes</h2>
+        <div class="filters">
+          <button class="filter active" data-filter="all">All</button>
+          <button class="filter" data-filter="favorites">♥ Favorites</button>
+        </div>
+      </div>
+      <section class="recipe-grid" id="recipeGrid"></section>
+    </main>
+
+    <aside class="side">
+      <section class="panel sidepanel">
+        <div class="side-head">
+          <h2>Shopping list</h2>
+          <span class="count" id="shopCount">0 items</span>
+        </div>
+        <p class="shop-preview" id="shopSubtitle">Ingredients from this week’s plan</p>
+        <div class="shopping-items" id="shoppingItems"></div>
+        <button class="full-btn" id="copyList">Copy shopping list</button>
+      </section>
+
+      <section class="panel sidepanel">
+        <div class="side-head">
+          <h2>Quick note</h2>
+          <span>🌿</span>
+        </div>
+        <div class="quick-note">
+          A plan can be flexible. Add a few favorites, leave room for leftovers,
+          and see how the week feels.
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <h2 id="modalTitle">Add a recipe</h2>
+      <button class="close" id="closeModal" aria-label="Close">×</button>
+    </div>
+
+    <form id="recipeForm">
+      <div class="field">
+        <label for="recipeName">Recipe name</label>
+        <input id="recipeName" required maxlength="60"
+          placeholder="e.g. Lemon chickpea bowls">
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="recipeEmoji">Little icon</label>
+          <select id="recipeEmoji">
+            <option>🥗</option>
+            <option>🍝</option>
+            <option>🍲</option>
+            <option>🌮</option>
+            <option>🍛</option>
+            <option>🥪</option>
+            <option>🍕</option>
+            <option>🍳</option>
+            <option>🥘</option>
+            <option>🍜</option>
+            <option>🥞</option>
+            <option>🧆</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="recipeTime">Time (minutes)</label>
+          <input id="recipeTime" type="number" min="1" max="600" value="25">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="recipeIngredients">Ingredients</label>
+        <textarea id="recipeIngredients" required
+          placeholder="1 can chickpeas&#10;1 lemon&#10;2 cups spinach"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="recipeDescription">A short note (optional)</label>
+        <input id="recipeDescription" maxlength="100"
+          placeholder="Bright, filling, and easy to prep">
+      </div>
+
+      <div class="modal-actions">
+        <button class="secondary" type="button" id="cancelModal">Cancel</button>
+        <button class="action" type="submit">Save recipe</button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY = "gather-meal-planner-v1";
+
+const seedRecipes = [
+  {
+    id: "r1",
+    name: "Lemon chickpea bowls",
+    emoji: "🥗",
+    time: 20,
+    ingredients: ["1 can chickpeas", "1 lemon", "2 cups spinach", "1 cup couscous", "½ cup plain yogurt"],
+    description: "Bright, filling, and easy to prep",
+    favorite: true
+  },
+  {
+    id: "r2",
+    name: "Creamy tomato pasta",
+    emoji: "🍝",
+    time: 25,
+    ingredients: ["250 g pasta", "1 can crushed tomatoes", "½ cup cream", "2 cloves garlic", "parmesan"],
+    description: "A cozy weeknight classic",
+    favorite: true
+  },
+  {
+    id: "r3",
+    name: "Crispy tofu tacos",
+    emoji: "🌮",
+    time: 30,
+    ingredients: ["250 g firm tofu", "6 small tortillas", "1 avocado", "1 lime", "1 cup red cabbage"],
+    description: "Crunchy, colorful, and fun",
+    favorite: false
+  },
+  {
+    id: "r4",
+    name: "Ginger veggie rice",
+    emoji: "🍚",
+    time: 25,
+    ingredients: ["2 cups rice", "1 broccoli", "2 carrots", "1 tbsp fresh ginger", "soy sauce"],
+    description: "A quick way to use up vegetables",
+    favorite: false
+  },
+  {
+    id: "r5",
+    name: "Mushroom lentil soup",
+    emoji: "🍲",
+    time: 40,
+    ingredients: ["200 g mushrooms", "1 cup green lentils", "1 onion", "1 litre vegetable stock", "thyme"],
+    description: "Comforting soup for a slower evening",
+    favorite: false
+  },
+  {
+    id: "r6",
+    name: "Herby egg toast",
+    emoji: "🍳",
+    time: 15,
+    ingredients: ["4 eggs", "4 slices sourdough bread", "1 avocado", "fresh herbs", "butter"],
+    description: "Simple enough for any time of day",
+    favorite: false
+  }
+];
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY));
+    if (saved && Array.isArray(saved.recipes) && saved.plan) {
+      return saved;
+    }
+  } catch (error) {
+  }
+
+  return { recipes: seedRecipes, plan: {}, checked: [] };
+}
+
+let state = loadState();
+let weekOffset = 0;
+let currentFilter = "all";
+let pendingSlot = null;
+
+function save() {
+  localStorage.setItem(KEY, JSON.stringify(state));
+}
+
+function weekStart() {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - ((date.getDay() + 6) % 7) + weekOffset * 7);
+  return date;
+}
+
+function keyDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return year + "-" + month + "-" + day;
+}
+
+function escapeText(text) {
+  return String(text).replace(/[&<>"']/g, function(character) {
+    const replacements = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    };
+    return replacements[character];
+  });
+}
+
+function renderAll() {
+  renderWeek();
+  renderRecipes();
+  renderShoppingList();
+}
+
+function renderWeek() {
+  const start = weekStart();
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+
+  document.getElementById("weekLabel").textContent =
+    start.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
+    " – " +
+    end.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+  const grid = document.getElementById("weekGrid");
+  const today = keyDate(new Date());
+  const days = [
+    "Monday", "Tuesday", "Wednesday", "Thursday",
+    "Friday", "Saturday", "Sunday"
+  ];
+
+  grid.innerHTML = "";
+
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + i);
+    const dateKey = keyDate(date);
+
+    const dayColumn = document.createElement("div");
+    dayColumn.className = "day";
+
+    if (dateKey === today) {
+      dayColumn.classList.add("today");
+    }
+
+    const heading = document.createElement("div");
+    heading.className = "dayhead";
+    heading.innerHTML =
+      `<div class="dayname">${days[i].slice(0, 3)}</div>
+       <div class="daydate">${date.getDate()}</div>`;
+
+    dayColumn.append(heading);
+
+    ["Breakfast", "Lunch", "Dinner"].forEach(function(mealName) {
+      const slot = document.createElement("div");
+      slot.className = "slot";
+      slot.innerHTML = `<div class="slotname">${mealName}</div>`;
+
+      const recipeId = state.plan[dateKey]?.[mealName];
+
+      if (recipeId) {
+        const recipe = state.recipes.find(function(item) {
+          return item.id === recipeId;
+        });
+
+        if (recipe) {
+          const mealCard = document.createElement("div");
+          mealCard.className = "meal-card";
+          mealCard.innerHTML =
+            `<button class="remove-meal" title="Remove meal">×</button>
+             <div class="meal-title">
+               ${escapeText(recipe.emoji)} ${escapeText(recipe.name)}
+             </div>
+             <div class="meal-meta">${recipe.time} min</div>`;
+
+          mealCard.querySelector(".remove-meal").onclick = function(event) {
+            event.stopPropagation();
+            delete state.plan[dateKey][mealName];
+            save();
+            renderAll();
+          };
+
+          slot.append(mealCard);
+        }
+      } else {
+        const addButton = document.createElement("button");
+        addButton.className = "add-slot";
+        addButton.textContent = "+ Add meal";
+        addButton.onclick = function() {
+          openAssign(dateKey, mealName);
+        };
+        slot.append(addButton);
+      }
+
+      dayColumn.append(slot);
+    });
+
+    grid.append(dayColumn);
+  }
+}
+
+function renderRecipes() {
+  const recipeGrid = document.getElementById("recipeGrid");
+  recipeGrid.innerHTML = "";
+
+  const recipes = state.recipes.filter(function(recipe) {
+    return currentFilter === "all" || recipe.favorite;
+  });
+
+  if (recipes.length === 0) {
+    recipeGrid.innerHTML =
+      '<div class="empty">No favorites yet. Tap the heart on a recipe to save one.</div>';
+    return;
+  }
+
+  recipes.forEach(function(recipe) {
+    const card = document.createElement("article");
+    card.className = "recipe";
+    card.innerHTML =
+      `<button class="favorite ${recipe.favorite ? "on" : ""}">
+         ${recipe.favorite ? "♥" : "♡"}
+       </button>
+       <div class="recipe-emoji">${escapeText(recipe.emoji)}</div>
+       <h3>${escapeText(recipe.name)}</h3>
+       <p>${escapeText(recipe.description || recipe.ingredients.join(", "))}</p>
+       <div class="recipe-bottom">
+         <span>◷ ${recipe.time} min</span>
+         <button class="recipe-add">＋ Add</button>
+       </div>`;
+
+    card.querySelector(".favorite").onclick = function() {
+      recipe.favorite = !recipe.favorite;
+      save();
+      renderRecipes();
+    };
+
+    card.querySelector(".recipe-add").onclick = function() {
+      openAssign(null, null, recipe.id);
+    };
+
+    recipeGrid.append(card);
+  });
+}
+
+function getWeeklyIngredients() {
+  const ingredients = new Map();
+  const start = weekStart();
+
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + i);
+    const meals = state.plan[keyDate(date)] || {};
+
+    Object.values(meals).forEach(function(recipeId) {
+      const recipe = state.recipes.find(function(item) {
+        return item.id === recipeId;
+      });
+
+      if (recipe) {
+        recipe.ingredients.forEach(function(ingredient) {
+          const cleanIngredient = ingredient.trim();
+          const key = cleanIngredient.toLowerCase();
+
+          if (cleanIngredient && !ingredients.has(key)) {
+            ingredients.set(key, cleanIngredient);
+          }
+        });
+      }
+    });
+  }
+
+  return [...ingredients.values()];
+}
+
+function renderShoppingList() {
+  const ingredients = getWeeklyIngredients();
+  const list = document.getElementById("shoppingItems");
+
+  document.getElementById("shopCount").textContent =
+    `${ingredients.length} item${ingredients.length === 1 ? "" : "s"}`;
+
+  document.getElementById("shopSubtitle").textContent =
+    ingredients.length
+      ? "Ingredients from this week’s plan"
+      : "Add recipes to your week to build your list";
+
+  list.innerHTML = "";
+
+  if (ingredients.length === 0) {
+    list.innerHTML =
+      '<div class="empty">Your list will appear here as you plan meals.</div>';
+    return;
+  }
+
+  ingredients.forEach(function(ingredient) {
+    const row = document.createElement("label");
+    const isChecked = state.checked.includes(ingredient.toLowerCase());
+
+    row.className = "shopping-row" + (isChecked ? " checked" : "");
+    row.innerHTML =
+      `<input type="checkbox" ${isChecked ? "checked" : ""}>
+       <span>${escapeText(ingredient)}</span>`;
+
+    row.querySelector("input").onchange = function(event) {
+      const key = ingredient.toLowerCase();
+
+      if (event.target.checked) {
+        state.checked.push(key);
+      } else {
+        state.checked = state.checked.filter(function(item) {
+          return item !== key;
+        });
+      }
+
+      save();
+      renderShoppingList();
+    };
+
+    list.append(row);
+  });
+}
+
+const backdrop = document.getElementById("modalBackdrop");
+
+function openRecipeForm() {
+  backdrop.classList.add("open");
+  document.getElementById("recipeName").focus();
+}
+
+function closeRecipeForm() {
+  backdrop.classList.remove("open");
+  document.getElementById("recipeForm").reset();
+}
+
+function findFreeSlot() {
+  const start = weekStart();
+
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + i);
+    const dateKey = keyDate(date);
+
+    for (const mealName of ["Dinner", "Lunch", "Breakfast"]) {
+      if (!state.plan[dateKey]?.[mealName]) {
+        return { day: dateKey, meal: mealName };
+      }
+    }
+  }
+
+  return null;
+}
+
+function openAssign(day, mealName, recipeId) {
+  if (recipeId) {
+    const freeSlot = findFreeSlot();
+
+    if (!freeSlot) {
+      showToast("Your week is full. Remove a meal to make room.");
+      return;
+    }
+
+    day = freeSlot.day;
+    mealName = freeSlot.meal;
+  }
+
+  if (day && mealName) {
+    pendingSlot = {
+      day: day,
+      meal: mealName,
+      recipeId: recipeId || null
+    };
+  } else {
+    pendingSlot = null;
+  }
+
+  openRecipeChooser();
+}
+
+function openRecipeChooser() {
+  const firstRecipe = state.recipes[0];
+
+  if (!firstRecipe) {
+    openRecipeForm();
+    return;
+  }
+
+  let day = pendingSlot?.day;
+  let mealName = pendingSlot?.meal;
+
+  if (!day || !mealName) {
+    const freeSlot = findFreeSlot();
+
+    if (!freeSlot) {
+      showToast("Your week is full. Remove a meal to make room.");
+      return;
+    }
+
+    day = freeSlot.day;
+    mealName = freeSlot.meal;
+  }
+
+  const preferredRecipe = pendingSlot?.recipeId;
+  const currentRecipe = state.plan[day]?.[mealName];
+  const selectedRecipe = preferredRecipe || currentRecipe || firstRecipe.id;
+
+  const popup = document.createElement("div");
+  popup.className = "modal-backdrop open";
+  popup.innerHTML =
+    `<section class="modal" role="dialog" aria-modal="true">
+       <div class="modal-head">
+         <h2>Add to your plan</h2>
+         <button class="close">×</button>
+       </div>
+       <div class="field">
+         <label>Recipe</label>
+         <select id="chooseRecipe">
+           ${state.recipes.map(function(recipe) {
+             return `<option value="${escapeText(recipe.id)}">
+               ${escapeText(recipe.emoji)} ${escapeText(recipe.name)}
+             </option>`;
+           }).join("")}
+         </select>
+       </div>
+       <div class="form-row">
+         <div class="field">
+           <label>Day</label>
+           <select id="chooseDay">
+             ${Array.from({ length: 7 }, function(_, i) {
+               const date = new Date(weekStart());
+               date.setDate(date.getDate() + i);
+               return `<option value="${keyDate(date)}">
+                 ${date.toLocaleDateString(undefined, {
+                   weekday: "long",
+                   month: "short",
+                   day: "numeric"
+                 })}
+               </option>`;
+             }).join("")}
+           </select>
+         </div>
+         <div class="field">
+           <label>Meal</label>
+           <select id="chooseSlot">
+             <option>Breakfast</option>
+             <option>Lunch</option>
+             <option>Dinner</option>
+           </select>
+         </div>
+       </div>
+       <div class="modal-actions">
+         <button class="secondary">Cancel</button>
+         <button class="action">Add meal</button>
+       </div>
+     </section>`;
+
+  document.body.append(popup);
+
+  popup.querySelector(".close").onclick = function() {
+    popup.remove();
+  };
+
+  popup.querySelector(".secondary").onclick = function() {
+    popup.remove();
+  };
+
+  popup.querySelector("#chooseRecipe").value = selectedRecipe;
+  popup.querySelector("#chooseDay").value = day;
+  popup.querySelector("#chooseSlot").value = mealName;
+
+  popup.querySelector(".action").onclick = function() {
+    const chosenDay = popup.querySelector("#chooseDay").value;
+    const chosenMeal = popup.querySelector("#chooseSlot").value;
+    const chosenRecipe = popup.querySelector("#chooseRecipe").value;
+
+    state.plan[chosenDay] ||= {};
+    state.plan[chosenDay][chosenMeal] = chosenRecipe;
+    state.checked = [];
+
+    save();
+    popup.remove();
+    renderAll();
+    showToast("Meal added to your week");
+  };
+
+  popup.onclick = function(event) {
+    if (event.target === popup) {
+      popup.remove();
+    }
+  };
+}
+
+document.getElementById("newRecipeBtn").onclick = openRecipeForm;
+document.getElementById("closeModal").onclick = closeRecipeForm;
+document.getElementById("cancelModal").onclick = closeRecipeForm;
+
+backdrop.onclick = function(event) {
+  if (event.target === backdrop) {
+    closeRecipeForm();
+  }
+};
+
+document.getElementById("recipeForm").onsubmit = function(event) {
+  event.preventDefault();
+
+  const ingredients = document
+    .getElementById("recipeIngredients")
+    .value
+    .split(/\n|,/)
+    .map(function(item) {
+      return item.trim();
+    })
+    .filter(Boolean);
+
+  state.recipes.unshift({
+    id: "r" + Date.now(),
+    name: document.getElementById("recipeName").value.trim(),
+    emoji: document.getElementById("recipeEmoji").value,
+    time: Number(document.getElementById("recipeTime").value) || 25,
+    ingredients: ingredients,
+    description: document.getElementById("recipeDescription").value.trim(),
+    favorite: false
+  });
+
+  save();
+  closeRecipeForm();
+  renderAll();
+  showToast("Recipe saved");
+};
+
+document.getElementById("prevWeek").onclick = function() {
+  weekOffset--;
+  renderAll();
+};
+
+document.getElementById("nextWeek").onclick = function() {
+  weekOffset++;
+  renderAll();
+};
+
+document.getElementById("thisWeek").onclick = function() {
+  weekOffset = 0;
+  renderAll();
+};
+
+document.querySelectorAll(".filter").forEach(function(button) {
+  button.onclick = function() {
+    document.querySelectorAll(".filter").forEach(function(item) {
+      item.classList.remove("active");
+    });
+
+    button.classList.add("active");
+    currentFilter = button.dataset.filter;
+    renderRecipes();
+  };
+});
+
+document.getElementById("copyList").onclick = async function() {
+  const ingredients = getWeeklyIngredients();
+
+  if (ingredients.length === 0) {
+    showToast("Add meals to your week first");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(
+      ingredients.map(function(item) {
+        return "• " + item;
+      }).join("\n")
+    );
+    showToast("Shopping list copied");
+  } catch (error) {
+    showToast("Could not copy. Select and copy the list items.");
+  }
+};
+
+let toastTimer;
+
+function showToast(message) {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+
+  toastTimer = setTimeout(function() {
+    toast.classList.remove("show");
+  }, 2200);
+}
+
+renderAll();
+</script>
+</body>
+</html>
